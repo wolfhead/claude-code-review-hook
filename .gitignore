@@ -3,6 +3,11 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package.json
+package-lock.json
+
+# Git hooks (managed by target repos, not this tool)
+.husky/
 
 # macOS
 .DS_Store

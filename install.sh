@@ -2,8 +2,25 @@
 
 # Installation script for Claude Code review hook
 # Run this from your repository root
+# Usage: ./install.sh [-y]
+#   -y    Auto-confirm all prompts (non-interactive mode)
 
 set -e
+
+# Parse command line arguments
+AUTO_YES=false
+while getopts "y" opt; do
+    case $opt in
+        y)
+            AUTO_YES=true
+            ;;
+        \?)
+            echo "Usage: $0 [-y]"
+            echo "  -y    Auto-confirm all prompts (non-interactive mode)"
+            exit 1
+            ;;
+    esac
+done
 
 # Colors
 GREEN='\033[0;32m'
@@ -25,18 +42,25 @@ fi
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOOK_SOURCE="$SCRIPT_DIR/pre-commit"
+HOOK_SOURCE="$SCRIPT_DIR/commit-msg"
 
 # Check if source hook exists
 if [ ! -f "$HOOK_SOURCE" ]; then
     echo -e "${RED}❌ Error: Hook script not found at $HOOK_SOURCE${NC}"
-    echo -e "Please ensure pre-commit exists in the same directory as this script"
+    echo -e "Please ensure commit-msg exists in the same directory as this script"
     exit 1
 fi
 
 # Function to prompt for yes/no
 prompt_yes_no() {
     local prompt="$1"
+
+    # Auto-yes mode
+    if [ "$AUTO_YES" = true ]; then
+        echo -e "${prompt} (y/n): y [auto]"
+        return 0
+    fi
+
     local response
     while true; do
         read -p "$(echo -e ${prompt}) (y/n): " response
@@ -139,16 +163,15 @@ if [ ! -d "$REPO_ROOT/.husky" ]; then
 fi
 
 # Install the hook via husky
-echo -e "${BLUE}📦 Installing pre-commit hook...${NC}"
+echo -e "${BLUE}📦 Installing commit-msg hook...${NC}"
 
-HUSKY_HOOK="$REPO_ROOT/.husky/pre-commit"
+HUSKY_HOOK="$REPO_ROOT/.husky/commit-msg"
 
-# Create or append to husky pre-commit hook
+# Create or append to husky commit-msg hook
 if [ ! -f "$HUSKY_HOOK" ]; then
-    # Create new husky hook
+    # Create new husky hook (modern format without deprecated husky.sh sourcing)
     cat > "$HUSKY_HOOK" << 'EOF'
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
+#!/bin/sh
 
 EOF
 fi
@@ -166,12 +189,12 @@ if grep -q "Claude Code Review Hook" "$HUSKY_HOOK" 2>/dev/null; then
     fi
 fi
 
-# Add our hook to husky
+# Add our hook to husky (pass $1 for commit message file)
 cat >> "$HUSKY_HOOK" << EOF
 
 # Claude Code Review Hook - START
-# Automatically reviews staged changes before commit
-"$HOOK_SOURCE"
+# Automatically reviews staged changes and commit message before finalizing commit
+"$HOOK_SOURCE" "\$1"
 # Claude Code Review Hook - END
 EOF
 
@@ -185,6 +208,53 @@ if [ -f "$REPO_ROOT/CLAUDE.md" ]; then
 else
     echo -e "${YELLOW}ℹ️  No CLAUDE.md found${NC}"
     echo -e "Consider creating one to define project-specific review criteria\n"
+fi
+
+# Offer to create custom API configuration
+if [ ! -f "$REPO_ROOT/.claude-review.env" ]; then
+    if prompt_yes_no "${BLUE}Would you like to create a custom API configuration file (.claude-review.env)?${NC}"; then
+        cat > "$REPO_ROOT/.claude-review.env" << 'EOF'
+# Claude Code Review Hook Configuration
+# This file allows you to use separate API settings for code reviews
+# These are standard Claude Code environment variables
+
+# API key (use ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN depending on provider)
+# export ANTHROPIC_API_KEY=sk-ant-...
+
+# API endpoint (examples below)
+# Anthropic official:
+# export ANTHROPIC_BASE_URL=https://api.anthropic.com
+# DeepSeek:
+# export ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+
+# Model name (depends on your provider)
+# export ANTHROPIC_MODEL=claude-sonnet-4-5-20250929
+
+# Optional: Request timeout in milliseconds
+# export API_TIMEOUT_MS=600000
+
+# Optional: Disable non-essential traffic
+# export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+
+EOF
+        echo -e "${GREEN}✅ Created .claude-review.env template${NC}"
+        echo -e "${YELLOW}Edit this file to configure custom API settings${NC}\n"
+
+        # Add to .gitignore if not already there
+        if [ -f "$REPO_ROOT/.gitignore" ]; then
+            if ! grep -q ".claude-review.env" "$REPO_ROOT/.gitignore"; then
+                echo ".claude-review.env" >> "$REPO_ROOT/.gitignore"
+                echo -e "${GREEN}✅ Added .claude-review.env to .gitignore${NC}\n"
+            fi
+        else
+            echo ".claude-review.env" > "$REPO_ROOT/.gitignore"
+            echo -e "${GREEN}✅ Created .gitignore with .claude-review.env${NC}\n"
+        fi
+    else
+        echo -e "${YELLOW}Skipping custom configuration. Hook will use default Claude Code settings.${NC}\n"
+    fi
+else
+    echo -e "${GREEN}✅ .claude-review.env already exists${NC}\n"
 fi
 
 # Final instructions

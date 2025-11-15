@@ -24,18 +24,18 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
 fi
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
-HUSKY_HOOK="$REPO_ROOT/.husky/pre-commit"
+HUSKY_HOOK="$REPO_ROOT/.husky/commit-msg"
 
 # Check if husky hook exists
 if [ ! -f "$HUSKY_HOOK" ]; then
-    echo -e "${YELLOW}⚠️  No husky pre-commit hook found${NC}"
+    echo -e "${YELLOW}⚠️  No husky commit-msg hook found${NC}"
     echo -e "The Claude Code review hook may not be installed, or you're using a different hook system."
     exit 0
 fi
 
 # Check if our hook is registered
 if ! grep -q "Claude Code Review Hook" "$HUSKY_HOOK" 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  Claude Code review hook not found in husky pre-commit${NC}"
+    echo -e "${YELLOW}⚠️  Claude Code review hook not found in husky commit-msg${NC}"
     echo -e "The hook may have already been removed or was never installed."
     exit 0
 fi
@@ -57,36 +57,36 @@ echo -e "${GREEN}✅ Claude Code review hook removed successfully!${NC}\n"
 REMAINING_LINES=$(grep -v "^#" "$HUSKY_HOOK" | grep -v "^$" | grep -v "^. " | wc -l | tr -d ' ')
 
 if [ "$REMAINING_LINES" -eq 0 ]; then
-    echo -e "${YELLOW}The pre-commit hook file is now empty (only husky header remains).${NC}"
+    echo -e "${YELLOW}The commit-msg hook file is now empty (only husky header remains).${NC}"
     echo -e "${BLUE}Would you like to remove it? (y/n):${NC} "
     read -r response
     case "$response" in
         [Yy]* )
             rm "$HUSKY_HOOK"
-            echo -e "${GREEN}✅ Removed empty pre-commit hook file${NC}\n"
+            echo -e "${GREEN}✅ Removed empty commit-msg hook file${NC}\n"
             ;;
         * )
-            echo -e "${YELLOW}Keeping empty pre-commit hook file${NC}\n"
+            echo -e "${YELLOW}Keeping empty commit-msg hook file${NC}\n"
             ;;
     esac
 else
-    echo -e "${GREEN}Other hooks remain in .husky/pre-commit${NC}\n"
+    echo -e "${GREEN}Other hooks remain in .husky/commit-msg${NC}\n"
 fi
 
 # Check for old-style .git/hooks installations (from previous versions)
-OLD_HOOK="$REPO_ROOT/.git/hooks/pre-commit"
+OLD_HOOK="$REPO_ROOT/.git/hooks/commit-msg"
 if [ -f "$OLD_HOOK" ]; then
-    if grep -q "Claude Code Pre-commit Review Hook" "$OLD_HOOK" 2>/dev/null; then
+    if grep -q "Claude Code.*Review Hook" "$OLD_HOOK" 2>/dev/null; then
         echo -e "${BLUE}Found old-style git hook installation${NC}"
         echo -e "${YELLOW}Would you like to remove it too? (y/n):${NC} "
         read -r response
         case "$response" in
             [Yy]* )
                 # Look for backups
-                BACKUPS=$(ls -1 "$REPO_ROOT/.git/hooks/pre-commit.backup."* 2>/dev/null || echo "")
+                BACKUPS=$(ls -1 "$REPO_ROOT/.git/hooks/commit-msg.backup."* 2>/dev/null || echo "")
                 if [ -n "$BACKUPS" ]; then
                     echo -e "\n${BLUE}Found backup(s):${NC}"
-                    ls -1 "$REPO_ROOT/.git/hooks/pre-commit.backup."*
+                    ls -1 "$REPO_ROOT/.git/hooks/commit-msg.backup."*
                     echo -e "\n${YELLOW}Would you like to restore a backup? (y/n):${NC} "
                     read -r restore_response
                     case "$restore_response" in
