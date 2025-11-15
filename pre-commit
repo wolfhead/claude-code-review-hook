@@ -95,8 +95,8 @@ EOF
     echo "Otherwise end with: '✅ APPROVED'" >> "$REVIEW_FILE"
 
     # Run Claude Code review
-    # Using --non-interactive mode to get direct output
-    REVIEW_OUTPUT=$(claude --non-interactive < "$REVIEW_FILE" 2>&1)
+    # Using --print mode to get direct output
+    REVIEW_OUTPUT=$(claude --print < "$REVIEW_FILE" 2>&1)
 
     # Display review
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
