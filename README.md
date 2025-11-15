@@ -23,6 +23,24 @@ The installer will automatically:
 
 **Note**: This tool doesn't need to be in your project. It's a standalone tool that installs hooks into your target repository.
 
+## Try the Demo
+
+Want to see it in action first? Check out the **demo repository** included with this tool:
+
+```bash
+cd claude-code-review-hook-demo
+cat README.md  # Read the demo guide
+cat .claude-review.env.example  # See example configuration
+```
+
+The demo includes:
+- Example code files with intentional issues
+- Sample `.claude-review.env.example` with DeepSeek and Anthropic configurations
+- Pre-configured hook ready to test
+- Instructions for trying different scenarios
+
+This is a great way to understand how the hook works before installing it in your own projects!
+
 ## What It Does
 
 - Automatically reviews all staged changes **and commit message** before finalizing commit
