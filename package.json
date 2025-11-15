@@ -1,0 +1,25 @@
+{
+  "name": "claude-code-review-hook",
+  "version": "1.0.0",
+  "description": "Automated AI code review using Claude Code CLI that runs before every git commit via Husky.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"No tests - this is a tool project\"",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wolfhead/claude-code-review-hook.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/wolfhead/claude-code-review-hook/issues"
+  },
+  "homepage": "https://github.com/wolfhead/claude-code-review-hook#readme",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

@@ -77,14 +77,10 @@ else
     fi
 fi
 
-# Check authentication if Claude is installed
+# Authentication reminder
 if [ "$CLAUDE_INSTALLED" = true ]; then
-    if claude whoami &> /dev/null; then
-        echo -e "${GREEN}✅ Claude Code is authenticated${NC}\n"
-    else
-        echo -e "${YELLOW}⚠️  Claude Code needs authentication${NC}"
-        echo -e "Run: ${BLUE}claude auth${NC}\n"
-    fi
+    echo -e "${BLUE}ℹ️  Make sure Claude Code is authenticated${NC}"
+    echo -e "If not already done, run: ${BLUE}claude auth${NC}\n"
 fi
 
 # Check for package.json (needed for husky)
@@ -93,6 +89,12 @@ if [ ! -f "$REPO_ROOT/package.json" ]; then
     echo -e "Initializing npm project..."
     cd "$REPO_ROOT"
     npm init -y
+
+    # Fix the default failing test script
+    if command -v node &> /dev/null; then
+        node -e "const pkg = require('./package.json'); pkg.scripts.test = 'echo \"No tests - this is a tool project\"'; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
+    fi
+
     echo -e "${GREEN}✅ Created package.json${NC}\n"
 fi
 
@@ -126,6 +128,13 @@ if [ ! -d "$REPO_ROOT/.husky" ]; then
     echo -e "${BLUE}Initializing Husky...${NC}"
     cd "$REPO_ROOT"
     npx husky init
+
+    # Remove the default "npm test" line that husky init adds
+    if [ -f "$REPO_ROOT/.husky/pre-commit" ]; then
+        sed -i.bak '/^npm test$/d' "$REPO_ROOT/.husky/pre-commit"
+        rm -f "$REPO_ROOT/.husky/pre-commit.bak"
+    fi
+
     echo -e "${GREEN}✅ Husky initialized${NC}\n"
 fi
 
@@ -146,12 +155,13 @@ fi
 
 # Check if our hook is already registered
 if grep -q "Claude Code Review Hook" "$HUSKY_HOOK" 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  Claude Code review hook already registered in husky${NC}"
-    if prompt_yes_no "${BLUE}Would you like to update it?${NC}"; then
+    echo -e "${YELLOW}⚠️  Claude Code review hook is already installed${NC}"
+    if prompt_yes_no "${BLUE}Would you like to overwrite and reinstall it?${NC}"; then
         # Remove old hook section
         sed -i.bak '/# Claude Code Review Hook - START/,/# Claude Code Review Hook - END/d' "$HUSKY_HOOK"
+        echo -e "${GREEN}Removing existing hook...${NC}"
     else
-        echo -e "${GREEN}Keeping existing hook${NC}\n"
+        echo -e "${GREEN}Keeping existing hook. Installation cancelled.${NC}\n"
         exit 0
     fi
 fi

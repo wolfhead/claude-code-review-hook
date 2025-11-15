@@ -1,0 +1,4 @@
+# Claude Code Review Hook - START
+# Automatically reviews staged changes before commit
+"/Users/meixueting/work/claude-code-review-hook/pre-commit"
+# Claude Code Review Hook - END
