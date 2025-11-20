@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Installation script for Claude Code review hook
-# Run this from your repository root
+# Installs directly to .git/hooks (no Husky, no npm dependencies)
 # Usage: ./install.sh [-y]
 #   -y    Auto-confirm all prompts (non-interactive mode)
 
@@ -43,6 +43,7 @@ fi
 REPO_ROOT=$(git rev-parse --show-toplevel)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK_SOURCE="$SCRIPT_DIR/commit-msg"
+GIT_HOOK="$REPO_ROOT/.git/hooks/commit-msg"
 
 # Check if source hook exists
 if [ ! -f "$HOOK_SOURCE" ]; then
@@ -85,12 +86,19 @@ else
     echo -e "${YELLOW}⚠️  Claude Code is not installed${NC}"
     if prompt_yes_no "${BLUE}Would you like to install Claude Code now?${NC}"; then
         echo -e "\n${BLUE}Installing Claude Code...${NC}"
-        if npm install -g @anthropic/claude-code; then
-            echo -e "${GREEN}✅ Claude Code installed successfully!${NC}\n"
-            CLAUDE_INSTALLED=true
+        if command -v npm &> /dev/null; then
+            if npm install -g @anthropic/claude-code; then
+                echo -e "${GREEN}✅ Claude Code installed successfully!${NC}\n"
+                CLAUDE_INSTALLED=true
+            else
+                echo -e "${RED}❌ Failed to install Claude Code${NC}"
+                echo -e "${YELLOW}Please install manually:${NC}"
+                echo -e "  npm install -g @anthropic/claude-code"
+                echo -e "  ${BLUE}Or visit: https://claude.com/code${NC}\n"
+            fi
         else
-            echo -e "${RED}❌ Failed to install Claude Code${NC}"
-            echo -e "${YELLOW}Please install manually:${NC}"
+            echo -e "${RED}❌ npm not found${NC}"
+            echo -e "${YELLOW}Please install Node.js and npm first, then run:${NC}"
             echo -e "  npm install -g @anthropic/claude-code"
             echo -e "  ${BLUE}Or visit: https://claude.com/code${NC}\n"
         fi
@@ -107,98 +115,44 @@ if [ "$CLAUDE_INSTALLED" = true ]; then
     echo -e "If not already done, run: ${BLUE}claude auth${NC}\n"
 fi
 
-# Check for package.json (needed for husky)
-if [ ! -f "$REPO_ROOT/package.json" ]; then
-    echo -e "${YELLOW}⚠️  No package.json found${NC}"
-    echo -e "Initializing npm project..."
-    cd "$REPO_ROOT"
-    npm init -y
-
-    # Fix the default failing test script
-    if command -v node &> /dev/null; then
-        node -e "const pkg = require('./package.json'); pkg.scripts.test = 'echo \"No tests - this is a tool project\"'; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
-    fi
-
-    echo -e "${GREEN}✅ Created package.json${NC}\n"
-fi
-
-# Check husky installation
-HUSKY_INSTALLED=false
-if [ -d "$REPO_ROOT/node_modules/husky" ] || grep -q "\"husky\"" "$REPO_ROOT/package.json" 2>/dev/null; then
-    echo -e "${GREEN}✅ Husky is installed${NC}"
-    HUSKY_INSTALLED=true
-else
-    echo -e "${YELLOW}⚠️  Husky is not installed${NC}"
-    if prompt_yes_no "${BLUE}Would you like to install Husky now?${NC}"; then
-        echo -e "\n${BLUE}Installing Husky...${NC}"
-        cd "$REPO_ROOT"
-        if npm install --save-dev husky; then
-            echo -e "${GREEN}✅ Husky installed successfully!${NC}\n"
-            HUSKY_INSTALLED=true
-        else
-            echo -e "${RED}❌ Failed to install Husky${NC}"
-            echo -e "${YELLOW}Please install manually: npm install --save-dev husky${NC}\n"
-            exit 1
-        fi
-    else
-        echo -e "${RED}❌ Husky is required for hook management${NC}"
-        echo -e "${YELLOW}Install it manually with: npm install --save-dev husky${NC}\n"
-        exit 1
-    fi
-fi
-
-# Initialize husky if not already initialized
-if [ ! -d "$REPO_ROOT/.husky" ]; then
-    echo -e "${BLUE}Initializing Husky...${NC}"
-    cd "$REPO_ROOT"
-    npx husky init
-
-    # Remove the default "npm test" line that husky init adds
-    if [ -f "$REPO_ROOT/.husky/pre-commit" ]; then
-        sed -i.bak '/^npm test$/d' "$REPO_ROOT/.husky/pre-commit"
-        rm -f "$REPO_ROOT/.husky/pre-commit.bak"
-    fi
-
-    echo -e "${GREEN}✅ Husky initialized${NC}\n"
-fi
-
-# Install the hook via husky
+# Install the hook
 echo -e "${BLUE}📦 Installing commit-msg hook...${NC}"
 
-HUSKY_HOOK="$REPO_ROOT/.husky/commit-msg"
+# Create hooks directory if it doesn't exist
+mkdir -p "$REPO_ROOT/.git/hooks"
 
-# Create or append to husky commit-msg hook
-if [ ! -f "$HUSKY_HOOK" ]; then
-    # Create new husky hook (modern format without deprecated husky.sh sourcing)
-    cat > "$HUSKY_HOOK" << 'EOF'
-#!/bin/sh
+# Check if hook already exists
+if [ -f "$GIT_HOOK" ]; then
+    echo -e "${YELLOW}⚠️  A commit-msg hook already exists${NC}"
 
-EOF
-fi
-
-# Check if our hook is already registered
-if grep -q "Claude Code Review Hook" "$HUSKY_HOOK" 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  Claude Code review hook is already installed${NC}"
-    if prompt_yes_no "${BLUE}Would you like to overwrite and reinstall it?${NC}"; then
-        # Remove old hook section
-        sed -i.bak '/# Claude Code Review Hook - START/,/# Claude Code Review Hook - END/d' "$HUSKY_HOOK"
-        echo -e "${GREEN}Removing existing hook...${NC}"
+    # Check if it's our hook
+    if grep -q "Claude Code.*Review Hook" "$GIT_HOOK" 2>/dev/null; then
+        if prompt_yes_no "${BLUE}Would you like to overwrite the existing Claude Code hook?${NC}"; then
+            # Create backup
+            BACKUP="$GIT_HOOK.backup.$(date +%Y%m%d_%H%M%S)"
+            cp "$GIT_HOOK" "$BACKUP"
+            echo -e "${BLUE}Created backup:${NC} $BACKUP"
+        else
+            echo -e "${GREEN}Keeping existing hook. Installation cancelled.${NC}\n"
+            exit 0
+        fi
     else
-        echo -e "${GREEN}Keeping existing hook. Installation cancelled.${NC}\n"
-        exit 0
+        echo -e "${RED}The existing hook is not a Claude Code review hook.${NC}"
+        if prompt_yes_no "${BLUE}Would you like to replace it? (A backup will be created)${NC}"; then
+            # Create backup
+            BACKUP="$GIT_HOOK.backup.$(date +%Y%m%d_%H%M%S)"
+            cp "$GIT_HOOK" "$BACKUP"
+            echo -e "${BLUE}Created backup:${NC} $BACKUP"
+        else
+            echo -e "${YELLOW}Installation cancelled to preserve existing hook.${NC}\n"
+            exit 0
+        fi
     fi
 fi
 
-# Add our hook to husky (pass $1 for commit message file)
-cat >> "$HUSKY_HOOK" << EOF
-
-# Claude Code Review Hook - START
-# Automatically reviews staged changes and commit message before finalizing commit
-"$HOOK_SOURCE" "\$1"
-# Claude Code Review Hook - END
-EOF
-
-chmod +x "$HUSKY_HOOK"
+# Copy the hook
+cp "$HOOK_SOURCE" "$GIT_HOOK"
+chmod +x "$GIT_HOOK"
 
 echo -e "${GREEN}✅ Hook installed successfully!${NC}\n"
 
@@ -262,6 +216,9 @@ echo -e "${BLUE}╔════════════════════�
 echo -e "${BLUE}║  Installation Complete!                    ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════╝${NC}\n"
 
+echo -e "${GREEN}The hook has been installed to:${NC}"
+echo -e "  $GIT_HOOK\n"
+
 echo -e "${GREEN}Next steps:${NC}"
 echo -e "1. Make some changes to your code"
 echo -e "2. Stage them: ${BLUE}git add <files>${NC}"
@@ -270,5 +227,8 @@ echo -e "4. Claude will automatically review your changes!\n"
 
 echo -e "${YELLOW}Tip:${NC} To bypass the review when needed, use:"
 echo -e "     ${BLUE}git commit --no-verify -m \"your message\"${NC}\n"
+
+echo -e "${YELLOW}Note:${NC} This hook is installed locally in .git/hooks/"
+echo -e "     Team members need to install it individually on their machines.\n"
 
 echo -e "${GREEN}Happy coding! 🚀${NC}"

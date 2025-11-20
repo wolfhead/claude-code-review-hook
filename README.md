@@ -1,6 +1,6 @@
 # Claude Code Review Hook
 
-Automated AI code review using Claude Code CLI that runs before every git commit via Husky.
+Automated AI code review using Claude Code CLI that runs before every git commit via git hooks.
 
 ## Quick Start
 
@@ -17,11 +17,11 @@ cd /path/to/your/project
 
 The installer will automatically:
 - Prompt to install Claude Code if not found
-- Prompt to install Husky if not found
-- Set up the commit-msg hook in YOUR repository via Husky
-- Work alongside your existing hooks
+- Install the hook directly to `.git/hooks/commit-msg`
+- Create optional `.claude-review.env` configuration file
+- Keep your repository root clean (no package.json, node_modules, or other dependencies)
 
-**Note**: This tool doesn't need to be in your project. It's a standalone tool that installs hooks into your target repository.
+**Note**: This tool doesn't need to be in your project. It's a standalone tool that installs hooks into your target repository's `.git/` directory.
 
 ## Try the Demo
 
@@ -48,7 +48,7 @@ This is a great way to understand how the hook works before installing it in you
 - Provides intelligent feedback with full codebase context
 - **Blocks commits** when critical security or quality issues are found
 - Helps maintain code quality and catch bugs early
-- Works alongside other hooks via Husky
+- Installs cleanly without cluttering your repository root
 
 ### How Blocking Works
 
@@ -77,10 +77,10 @@ The commit message you write (with `-m` or in your editor) is included in the re
 
 ## Prerequisites
 
-The installation script will help you install these if missing:
-- **Claude Code**: `npm install -g @anthropic/claude-code`
-- **Husky**: `npm install --save-dev husky` (for hook management)
-- **Node.js/npm**: Required for the above packages
+The installation script will help you install this if missing:
+- **Claude Code CLI**: `npm install -g @anthropic/claude-code`
+  - This is the only requirement! The hook installs directly to `.git/hooks/`
+  - No other dependencies needed (no Husky, no package.json, no node_modules in your project)
 
 ## Installation
 
@@ -95,9 +95,9 @@ The installation script will help you install these if missing:
 The installer will:
 1. Check if you're in a git repository
 2. Check for Claude Code and offer to install if missing
-3. Check for Husky and offer to install if missing
-4. Add the review hook to `.husky/commit-msg`
-5. Verify authentication status
+3. Copy the hook to `.git/hooks/commit-msg`
+4. Optionally create `.claude-review.env` configuration file
+5. Remind you to authenticate Claude Code if needed
 
 **Options:**
 - `-y`: Non-interactive mode - automatically answers "yes" to all prompts (useful for CI/CD or scripts)
@@ -110,10 +110,9 @@ The installer will:
 ```
 
 The uninstaller will:
-- Remove the hook from `.husky/commit-msg`
-- Preserve other hooks you may have
-- Optionally clean up empty hook files
-- Keep backups for safety
+- Remove the hook from `.git/hooks/commit-msg`
+- Create a backup for safety
+- Optionally remove `.claude-review.env`
 
 ## Configuration
 
@@ -192,27 +191,36 @@ git commit --no-verify -m "wip: work in progress"
 
 ## Sharing with Team
 
-You can share this tool with your team in two ways:
+Since the hook is installed in `.git/hooks/` (which is not version-controlled), each team member needs to install it individually.
 
-**Option 1: Each team member installs individually**
+**Recommended approach:**
+
+1. **Add this tool to your project as a submodule** (or just document the installation in your README):
 ```bash
-# Team members clone the tool
-git clone https://github.com/your-repo/claude-code-review-hook.git ~/tools/claude-code-review-hook
-
-# Then install it in their local copy of the project
-cd /path/to/project
-~/tools/claude-code-review-hook/install.sh
+# In your project
+git submodule add https://github.com/your-repo/claude-code-review-hook.git .tools/claude-code-review-hook
 ```
 
-**Option 2: Add the tool as a git submodule to your project** (optional)
-```bash
-# Add as submodule in your project
-git submodule add https://github.com/your-repo/claude-code-review-hook.git .tools/claude-code-review-hook
+2. **Document the setup in your project's README**:
+```markdown
+## Setup
 
-# Team members can then install with:
-git submodule update --init
+After cloning this repo, install the code review hook:
+
+```bash
 .tools/claude-code-review-hook/install.sh
 ```
+
+3. **Team members run the installer after cloning**:
+```bash
+# After cloning the project
+git clone your-project
+cd your-project
+git submodule update --init  # If using submodules
+.tools/claude-code-review-hook/install.sh
+```
+
+**Note**: Each developer installs the hook locally. The hook itself is not committed to the repository, keeping your repo clean.
 
 ## Technical Details
 
@@ -224,6 +232,13 @@ The hook runs during the `commit-msg` phase of the git commit process:
 3. The hook reads both the commit message and staged changes
 4. Claude Code reviews both together, checking for consistency and issues
 5. If approved, the commit proceeds; if blocked, the commit is aborted
+
+### Installation Details
+
+The hook is installed to `.git/hooks/commit-msg`, which:
+- Git executes automatically during `git commit` after the commit message is written
+- Is not tracked by git (keeps your repository clean)
+- Needs to be installed by each team member individually
 
 The hook uses Claude Code CLI in headless mode with the following flags:
 - `--print`: Non-interactive mode for automation
@@ -241,7 +256,7 @@ If you see the configuration but then the hook fails silently:
 📝 Configuration from .claude-review.env:
    🔑 API Key: sk_7Cyz***...***6GE
    ...
-husky - commit-msg script failed (code 1)
+(no output, command exits with code 1)
 ```
 
 **Common causes:**
@@ -276,10 +291,10 @@ If you need to commit without running the review:
 git commit --no-verify -m "your message"
 ```
 
-## Why Husky?
+### Debug the hook
 
-We use [Husky](https://typicode.github.io/husky/) for hook management because:
-- Multiple git hooks can coexist peacefully
-- Hooks are committed to the repository
-- Easy team-wide setup
-- Industry standard for JavaScript/TypeScript projects
+If you're having issues, you can:
+1. Check the prompt file shown in the output (saved in /tmp)
+2. Replay the exact command shown in the hook output
+3. Check `.git/hooks/commit-msg` exists and is executable
+4. Verify Claude Code is authenticated: `claude auth`

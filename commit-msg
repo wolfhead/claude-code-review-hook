@@ -113,6 +113,7 @@ Review the following staged changes and commit message before finalizing the com
 ## Review Criteria for Go Code
 
 1. **Code Quality**
+   - Protential bugs and security issues
    - Go idioms and best practices
    - Error handling patterns
    - Code clarity and maintainability
@@ -128,23 +129,21 @@ Review the following staged changes and commit message before finalizing the com
    - Resource leaks
    - Inefficient patterns
 
-4. **Redis Integration** (if applicable)
-   - Connection handling
-   - Error recovery
-   - Data structure usage
-
-5. **gRPC/API Security**
+4. **gRPC/API Security**
    - Input validation
    - Injection vulnerabilities
    - Authentication/authorization
 
-6. **Testing**
+5. **Testing**
    - Test coverage gaps
    - Edge cases
 
 ## Project Standards
 
 Please check against our coding standards in CLAUDE.md if it exists.
+
+## Remarks
+- Please point out where the issues are with specific file and line numbers.
 
 EOF
 
@@ -191,15 +190,23 @@ EOF
     echo -e "${BLUE}💾 Prompt file:${NC} $REVIEW_FILE"
     echo -e "${BLUE}🔧 Command:${NC} $CLAUDE_CMD < $REVIEW_FILE"
     echo ""
+    echo -e "${YELLOW}⏳ Analyzing code... (streaming output below)${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
     # Run Claude Code review
     # Using --print mode to get direct output
     # Environment variables (ANTHROPIC_*) are already loaded from .claude-review.env if it exists
+    # Stream output to user in real-time while also capturing it
+    OUTPUT_FILE="$TEMP_DIR/claude_output.txt"
+
     # Temporarily disable exit-on-error to capture the exit code
     set +e
-    REVIEW_OUTPUT=$($CLAUDE_CMD < "$REVIEW_FILE" 2>&1)
-    CLAUDE_EXIT_CODE=$?
+    $CLAUDE_CMD < "$REVIEW_FILE" 2>&1 | tee "$OUTPUT_FILE"
+    CLAUDE_EXIT_CODE=${PIPESTATUS[0]}
     set -e
+
+    # Read the captured output for later checks
+    REVIEW_OUTPUT=$(cat "$OUTPUT_FILE")
 
     # Check if Claude command succeeded
     if [ $CLAUDE_EXIT_CODE -ne 0 ]; then
@@ -247,13 +254,10 @@ EOF
         exit 1
     fi
 
-    # Display review
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}📋 Claude Code Review Results${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    # Review output was already displayed in real-time above
+    # Just add a separator
     echo ""
-    echo "$REVIEW_OUTPUT"
-    echo ""
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
     # Check if review recommends blocking
     # Use flexible pattern to handle markdown formatting, whitespace variations, etc.
